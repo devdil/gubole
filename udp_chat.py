@@ -26,22 +26,22 @@ def switch(command="default"):
             Thread(target=discover, args=   None).start()
         else:
             print cli_template("You have already triggered discovery request!")
-    elif command == "exit"
+    elif command == "exit":
         print cli_template("Bye!")
         sys.exit(0)
 
-def discover(interface_name=None):
+def discover(interface_name=None, my_node_name="john"):
     max_discover_requests=5
     while max_discover_requests:
         if interface_name:
             interface_address = netifaces.ifaddresses(interface_name)[netifaces.AF_LINK]
             broadcast_ip_address = netifaces.ifaddresses(interface_name)[netifaces.AF_INET]['broadcast']
-            my_ip_addr = netifacs.ifaddresses(inteface_name[netifaces.AF_INET])['addr']
+            my_ip_addr = netifaces.ifaddresses(interface_name[netifaces.AF_INET])['addr']
             # example message="00:02:55:7b:b2:f6::192.168.1.10::john"
             # where params are split by ::
-            message = "{}::{]::{}".format(interface_address, my_ip_addr, my_name)
-            sock = socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.send(message, (broadcast_ip_address, UDP_PORT))
+            message = "{}::{]::{}".format(interface_address, my_ip_addr, my_node_name)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.send(message, (broadcast_ip_address, UDP_LISTEN_PORT))
             max_discover_requests -= 1
     time.sleep(10)
 
@@ -50,13 +50,16 @@ def cli_template(message=""):
     return "p2p_chat> {}".format(message)
 
 
-def startServer(ip, port):
-    udp_ip = ip
-    udp_port = port
-    sock = socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(udp_ip, udp_port)
+def startServer(interface_name):
+    print "interface name {}".format(interface_name)
+    udp_ip = (netifaces.ifaddresses(interface_name))[netifaces.AF_INET][0]['addr']
+    print "udp _ip {}".format(udp_ip)
+    udp_port = UDP_LISTEN_PORT
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((udp_ip, udp_port))
 
     while True:
+        print "Receiving..."
         data, addr = sock.recvfrom(1024)
         print "Received {}".format(data)
         if "::" in data:
@@ -69,13 +72,14 @@ def startServer(ip, port):
                 #the node could be restarted in a dhcp with a new node ip or sending a periodic broadcast request
                 #anyways lets save inside the mao
                 peerMap[peer_node_name] = peer_node_ip_addr
+                print peerMap
         else:
             #could be a normal send request from a peer node,
             #message from a peer node
             final_message = ": ".join(data.split(">"))
             print cli_template(final_message)
 
-def startClient():
+def startClient(interface_name, my_node_name):
     global commandList
     print cli_template("Welcome to p2p chat!")
     print cli_template("Type help for commands")
@@ -86,17 +90,22 @@ def startClient():
 
 
 
-def startCli():
-    Thread(startServer, args=(ip, port)).start()
-    Thread(startClient, args=None).start()
+def startCli(my_node_name, interface_name):
+    print "Node name {}".format(my_node_name)
+    print "Interface name {}".format(interface_name)
+    t1 = Thread(target=startServer, args=(interface_name,)).start()
+    #t2 = Thread(target=startClient, args=(interface_name, my_node_name)).start()
 
 def chatCli():
     command = raw_input(cli_template())
 
 
-def start():
-    startCli()
+def start(my_node_name, interface_name):
+    print "Starting client chat"
+    startCli(my_node_name, interface_name)
 
 
 if __name__ == "__main__":
-    start()
+    my_node_name=sys.argv[2]
+    interface_name=sys.argv[1]
+    start(my_node_name, interface_name)
