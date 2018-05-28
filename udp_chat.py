@@ -23,27 +23,33 @@ def switch(command="default"):
     elif command == "discover":
         if not isdiscoverTriggered:
             isdiscoverTriggered=True
-            Thread(target=discover, args=   None).start()
+            Thread(target=discover).start()
         else:
             print cli_template("You have already triggered discovery request!")
     elif command == "exit":
         print cli_template("Bye!")
         sys.exit(0)
 
-def discover(interface_name=None, my_node_name="john"):
+def discover():
+    interface_name="en0"
+    my_node_name="diljit"
     max_discover_requests=5
     while max_discover_requests:
         if interface_name:
-            interface_address = netifaces.ifaddresses(interface_name)[netifaces.AF_LINK]
-            broadcast_ip_address = netifaces.ifaddresses(interface_name)[netifaces.AF_INET]['broadcast']
-            my_ip_addr = netifaces.ifaddresses(interface_name[netifaces.AF_INET])['addr']
+            interface_address = netifaces.ifaddresses(interface_name)[netifaces.AF_LINK][0]['addr']
+            print "diljit :",interface_address
+            broadcast_ip_address =  (netifaces.ifaddresses(interface_name))[netifaces.AF_INET][0]['broadcast']
+            my_ip_addr =  (netifaces.ifaddresses(interface_name))[netifaces.AF_INET][0]['addr']
             # example message="00:02:55:7b:b2:f6::192.168.1.10::john"
             # where params are split by ::
-            message = "{}::{]::{}".format(interface_address, my_ip_addr, my_node_name)
+            message = "{}::{}::{}".format(interface_address, my_ip_addr, my_node_name)
+            print "Sending discover request with self info {}".format(message)
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.send(message, (broadcast_ip_address, UDP_LISTEN_PORT))
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            print "broadcast ", broadcast_ip_address
+            sock.sendto(message, (broadcast_ip_address, UDP_LISTEN_PORT))
             max_discover_requests -= 1
-    time.sleep(10)
+        time.sleep(10)
 
 
 def cli_template(message=""):
@@ -64,6 +70,7 @@ def startServer(interface_name):
         print "Received {}".format(data)
         if "::" in data:
             peer_node_mac_address, peer_node_ip_addr, peer_node_name = data.split("::")
+            print "received peer info {} {} {}".format(peer_node_mac_address, peer_node_ip_addr, peer_node_name)
             if not peerMap.get(peer_node_name, None):
                 #peer is not there in our map, lets add it in our map
                 peerMap[peer_node_name] = peer_node_ip_addr
@@ -93,8 +100,8 @@ def startClient(interface_name, my_node_name):
 def startCli(my_node_name, interface_name):
     print "Node name {}".format(my_node_name)
     print "Interface name {}".format(interface_name)
-    t1 = Thread(target=startServer, args=(interface_name,)).start()
-    #t2 = Thread(target=startClient, args=(interface_name, my_node_name)).start()
+    #t1 = Thread(target=startServer, args=(interface_name,)).start()
+    t2 = Thread(target=startClient, args=(interface_name, my_node_name)).start()
 
 def chatCli():
     command = raw_input(cli_template())
